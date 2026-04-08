@@ -131,6 +131,16 @@
 
     .toast.fade-out { opacity: 0; }
 
+    #word-reveal {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.15rem;
+      color: #1a1a1a;
+      min-height: 1.6em;
+      padding: 4px 0;
+    }
+
     #board-container {
       flex: 1;
       display: flex;
@@ -263,6 +273,7 @@
   </header>
   <div id="toast-container"></div>
   <div id="board-container"><div id="board"></div></div>
+  <div id="word-reveal"></div>
   <div id="keyboard"></div>
 </div>
 <script>
@@ -1725,9 +1736,13 @@ function submitGuess() {
       gameOver = true;
       bounceRow(row);
       setTimeout(() => toast(WIN_MSGS[row] ?? 'Genius!', 2200), 350);
+      setTimeout(() => { document.getElementById('word-reveal').textContent = TARGET.toUpperCase(); }, 2600);
     } else if (currentRow >= ROWS) {
       gameOver = true;
-      setTimeout(() => toast(TARGET.toUpperCase(), 4000), 250);
+      setTimeout(() => {
+        toast(TARGET.toUpperCase(), 4000);
+        document.getElementById('word-reveal').textContent = TARGET.toUpperCase();
+      }, 250);
     }
     saveState();
   });
@@ -1871,6 +1886,7 @@ function loadState() {
     // Restore keyboard colours
     updateKeys();
     updateModeLabel();
+    document.getElementById('word-reveal').textContent = s.gameOver ? TARGET.toUpperCase() : '';
     return true;
   } catch (e) {
     return false;
@@ -1902,6 +1918,7 @@ function resetGame(word, daily) {
     delete el.dataset.state;
   }
 
+  document.getElementById('word-reveal').textContent = '';
   updateModeLabel();
   updateCountdown();
   saveState();
