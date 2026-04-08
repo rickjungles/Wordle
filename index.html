@@ -65,6 +65,15 @@
       margin-top: 2px;
     }
 
+    #countdown {
+      font-size: 0.65rem;
+      color: #888;
+      text-align: center;
+      margin-top: 3px;
+      letter-spacing: 0.03rem;
+      min-height: 1em;
+    }
+
     #header-left {
       flex: 1;
     }
@@ -75,8 +84,7 @@
       justify-content: flex-end;
     }
 
-    #new-game-btn {
-      background: var(--color-correct);
+    #new-game-btn, #daily-btn {
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -90,8 +98,11 @@
       white-space: nowrap;
     }
 
-    #new-game-btn:hover { filter: brightness(1.1); }
-    #new-game-btn:active { filter: brightness(0.9); }
+    #new-game-btn { background: var(--color-correct); }
+    #daily-btn    { background: var(--color-present); }
+
+    #new-game-btn:hover, #daily-btn:hover { filter: brightness(1.1); }
+    #new-game-btn:active, #daily-btn:active { filter: brightness(0.9); }
 
     #toast-container {
       position: fixed;
@@ -238,10 +249,13 @@
 <body>
 <div id="app">
   <header id="header">
-    <div id="header-left"></div>
+    <div id="header-left">
+      <button type="button" id="daily-btn" style="display:none">Word of the Day</button>
+    </div>
     <div>
       <h1>Wordle</h1>
       <div id="mode-label"></div>
+      <div id="countdown"></div>
     </div>
     <div id="header-right">
       <button type="button" id="new-game-btn">New Game</button>
@@ -1571,9 +1585,17 @@ const GUESSES5 = VALID_GUESSES.filter(w => w.length === 5 && !ANSWERS5.includes(
 // Build fast lookup set
 const ALL_WORDS = new Set([...ANSWERS5, ...GUESSES5]);
 
-// Daily word (anchored to 2026-01-01)
-const EPOCH    = new Date('2026-01-01').getTime();
-const dayIndex = Math.floor((Date.now() - EPOCH) / 86400000);
+// Daily word — day index counted in Central Time calendar days since 2026-01-01
+function getCentralDayIndex() {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric'
+  });
+  const [nm, nd, ny] = fmt.format(new Date()).split('/').map(Number);
+  const today = new Date(ny, nm - 1, nd);
+  const epoch = new Date(2026, 0, 1);
+  return Math.floor((today - epoch) / 86400000);
+}
+const dayIndex = getCentralDayIndex();
 const DAILY_WORD = ANSWERS5[((dayIndex % ANSWERS5.length) + ANSWERS5.length) % ANSWERS5.length];
 
 // ─── STATE ─────────────────────────────────────────────────────────────────────
@@ -1797,7 +1819,8 @@ function updateKeys() {
 }
 
 // ─── PERSISTENCE ───────────────────────────────────────────────────────────────
-const SAVE_KEY = 'wordle_state_v1';
+const SAVE_KEY       = 'wordle_state_v1';
+const DAILY_SAVE_KEY = 'wordle_daily_state_v1';
 
 function saveState() {
   const board = [], boardStates = [];
@@ -1880,21 +1903,81 @@ function resetGame(word, daily) {
   }
 
   updateModeLabel();
+  updateCountdown();
   saveState();
 }
 
 function updateModeLabel() {
-  const el = document.getElementById('mode-label');
-  el.textContent = isDaily ? `#${dayIndex}  ·  Word of the Day` : 'Practice Mode';
+  document.getElementById('mode-label').textContent =
+    isDaily ? `#${dayIndex}  ·  Word of the Day` : 'Practice Mode';
+  document.getElementById('daily-btn').style.display = isDaily ? 'none' : '';
 }
 
+function getNextMidnightCentral() {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric'
+  });
+  const [mo, d, y] = fmt.format(now).split('/').map(Number);
+  // Try UTC-5 (CDT) then UTC-6 (CST) — pick whichever lands on 00:00 CT
+  for (const offsetH of [5, 6]) {
+    const candidate = new Date(Date.UTC(y, mo - 1, d + 1, offsetH, 0, 0));
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(candidate);
+    const hour = parseInt(parts.find(p => p.type === 'hour').value);
+    const min  = parseInt(parts.find(p => p.type === 'minute').value);
+    if (hour === 0 && min === 0) return candidate.getTime();
+  }
+  return new Date(Date.UTC(y, mo - 1, d + 1, 6, 0, 0)).getTime(); // CST fallback
+}
+
+function updateCountdown() {
+  const el = document.getElementById('countdown');
+  if (!isDaily) { el.textContent = ''; return; }
+  const now = Date.now();
+  const diff = getNextMidnightCentral() - now;
+  if (diff <= 0) {
+    el.textContent = 'New word available \u2014 refresh to play!';
+    return;
+  }
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  const s = Math.floor((diff % 60000) / 1000);
+  el.textContent = `Next word in ${h}h\u202f${String(m).padStart(2,'0')}m\u202f${String(s).padStart(2,'0')}s`;
+}
+setInterval(updateCountdown, 1000);
+
 document.getElementById('new-game-btn').addEventListener('click', () => {
+  // Snapshot daily state before leaving so "Word of the Day" can restore it
+  if (isDaily) {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) localStorage.setItem(DAILY_SAVE_KEY, raw);
+  }
   const word = ANSWERS5[Math.floor(Math.random() * ANSWERS5.length)];
   resetGame(word, false);
 });
 
+document.getElementById('daily-btn').addEventListener('click', () => {
+  // Try to restore saved daily state for today
+  try {
+    const raw = localStorage.getItem(DAILY_SAVE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s.isDaily && s.dayIndex === dayIndex) {
+        // Copy back as the active save and reload it
+        localStorage.setItem(SAVE_KEY, raw);
+        if (loadState()) return;
+      }
+    }
+  } catch (e) { /* fall through */ }
+  // No valid saved daily state — start fresh
+  resetGame(DAILY_WORD, true);
+});
+
 // Set initial label, then try to restore saved state
 if (!loadState()) updateModeLabel();
+updateCountdown();
 
 // ─── TOAST ─────────────────────────────────────────────────────────────────────
 function toast(msg, duration = 1200) {
