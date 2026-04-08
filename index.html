@@ -39,9 +39,9 @@
       width: 100%;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       border-bottom: 1px solid #878a8c;
-      padding: 12px 0;
+      padding: 10px 16px;
       flex-shrink: 0;
     }
 
@@ -51,7 +51,47 @@
       letter-spacing: 0.2rem;
       color: var(--text);
       text-transform: uppercase;
+      flex: 1;
+      text-align: center;
     }
+
+    #mode-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.05rem;
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    #header-left {
+      flex: 1;
+    }
+
+    #header-right {
+      flex: 1;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    #new-game-btn {
+      background: var(--color-correct);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #new-game-btn:hover { filter: brightness(1.1); }
+    #new-game-btn:active { filter: brightness(0.9); }
 
     #toast-container {
       position: fixed;
@@ -197,7 +237,16 @@
 </head>
 <body>
 <div id="app">
-  <header id="header"><h1>Wordle</h1></header>
+  <header id="header">
+    <div id="header-left"></div>
+    <div>
+      <h1>Wordle</h1>
+      <div id="mode-label"></div>
+    </div>
+    <div id="header-right">
+      <button type="button" id="new-game-btn">New Game</button>
+    </div>
+  </header>
   <div id="toast-container"></div>
   <div id="board-container"><div id="board"></div></div>
   <div id="keyboard"></div>
@@ -1523,16 +1572,18 @@ const GUESSES5 = VALID_GUESSES.filter(w => w.length === 5 && !ANSWERS5.includes(
 const ALL_WORDS = new Set([...ANSWERS5, ...GUESSES5]);
 
 // Daily word (anchored to 2026-01-01)
-const EPOCH     = new Date('2026-01-01').getTime();
-const dayIndex  = Math.floor((Date.now() - EPOCH) / 86400000);
-const TARGET    = ANSWERS5[((dayIndex % ANSWERS5.length) + ANSWERS5.length) % ANSWERS5.length];
+const EPOCH    = new Date('2026-01-01').getTime();
+const dayIndex = Math.floor((Date.now() - EPOCH) / 86400000);
+const DAILY_WORD = ANSWERS5[((dayIndex % ANSWERS5.length) + ANSWERS5.length) % ANSWERS5.length];
 
 // ─── STATE ─────────────────────────────────────────────────────────────────────
+let TARGET      = DAILY_WORD;
+let isDaily     = true;
 let currentRow  = 0;
 let currentCol  = 0;
 let currentGuess = [];
 let gameOver    = false;
-let letterStates = {};   // letter → 'correct' | 'present' | 'absent'
+let letterStates = {};
 let isAnimating = false;
 
 const WIN_MSGS  = ["Genius!","Magnificent!","Impressive!","Splendid!","Great!","Phew!"];
@@ -1741,6 +1792,47 @@ function updateKeys() {
     if (keyEls[letter]) keyEls[letter].dataset.state = state;
   }
 }
+
+// ─── RESET / NEW GAME ──────────────────────────────────────────────────────────
+function resetGame(word, daily) {
+  TARGET       = word;
+  isDaily      = daily;
+  currentRow   = 0;
+  currentCol   = 0;
+  currentGuess = [];
+  gameOver     = false;
+  letterStates = {};
+  isAnimating  = false;
+
+  // Clear board
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      tiles[r][c].textContent = '';
+      tiles[r][c].dataset.state = '';
+      tiles[r][c].classList.remove('flip-in','flip-out','tile-shake','tile-bounce');
+    }
+  }
+
+  // Clear keyboard colours
+  for (const el of Object.values(keyEls)) {
+    delete el.dataset.state;
+  }
+
+  updateModeLabel();
+}
+
+function updateModeLabel() {
+  const el = document.getElementById('mode-label');
+  el.textContent = isDaily ? `#${dayIndex}  ·  Word of the Day` : 'Practice Mode';
+}
+
+document.getElementById('new-game-btn').addEventListener('click', () => {
+  const word = ANSWERS5[Math.floor(Math.random() * ANSWERS5.length)];
+  resetGame(word, false);
+});
+
+// Set initial label
+updateModeLabel();
 
 // ─── TOAST ─────────────────────────────────────────────────────────────────────
 function toast(msg, duration = 1200) {
