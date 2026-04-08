@@ -1650,6 +1650,7 @@ function addLetter(letter) {
   tile.dataset.state = 'tbd';
   currentGuess.push(letter);
   currentCol++;
+  saveState();
 }
 
 function deleteLetter() {
@@ -1659,6 +1660,7 @@ function deleteLetter() {
   const tile = tiles[currentRow][currentCol];
   tile.textContent = '';
   tile.dataset.state = '';
+  saveState();
 }
 
 // ─── SUBMIT ────────────────────────────────────────────────────────────────────
@@ -1705,6 +1707,7 @@ function submitGuess() {
       gameOver = true;
       setTimeout(() => toast(TARGET.toUpperCase(), 4000), 250);
     }
+    saveState();
   });
 }
 
@@ -1793,6 +1796,64 @@ function updateKeys() {
   }
 }
 
+// ─── PERSISTENCE ───────────────────────────────────────────────────────────────
+const SAVE_KEY = 'wordle_state_v1';
+
+function saveState() {
+  const board = [], boardStates = [];
+  for (let r = 0; r < ROWS; r++) {
+    board.push([]);
+    boardStates.push([]);
+    for (let c = 0; c < COLS; c++) {
+      board[r].push(tiles[r][c].textContent.toLowerCase());
+      boardStates[r].push(tiles[r][c].dataset.state || '');
+    }
+  }
+  localStorage.setItem(SAVE_KEY, JSON.stringify({
+    isDaily, dayIndex, target: TARGET,
+    board, boardStates,
+    currentRow, currentCol, currentGuess,
+    letterStates, gameOver
+  }));
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+
+    // Daily save from a previous day → discard
+    if (s.isDaily && s.dayIndex !== dayIndex) return false;
+
+    // Restore variables
+    TARGET       = s.target;
+    isDaily      = s.isDaily;
+    currentRow   = s.currentRow;
+    currentCol   = s.currentCol;
+    currentGuess = s.currentGuess || [];
+    letterStates = s.letterStates || {};
+    gameOver     = s.gameOver;
+
+    // Restore board tiles
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const letter = s.board[r][c];
+        const state  = s.boardStates[r][c];
+        if (letter) tiles[r][c].textContent = letter.toUpperCase();
+        if (state)  tiles[r][c].dataset.state = state;
+      }
+    }
+
+    // Restore keyboard colours
+    updateKeys();
+    updateModeLabel();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // ─── RESET / NEW GAME ──────────────────────────────────────────────────────────
 function resetGame(word, daily) {
   TARGET       = word;
@@ -1819,6 +1880,7 @@ function resetGame(word, daily) {
   }
 
   updateModeLabel();
+  saveState();
 }
 
 function updateModeLabel() {
@@ -1831,8 +1893,8 @@ document.getElementById('new-game-btn').addEventListener('click', () => {
   resetGame(word, false);
 });
 
-// Set initial label
-updateModeLabel();
+// Set initial label, then try to restore saved state
+if (!loadState()) updateModeLabel();
 
 // ─── TOAST ─────────────────────────────────────────────────────────────────────
 function toast(msg, duration = 1200) {
