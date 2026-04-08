@@ -46,9 +46,9 @@
     }
 
     #header h1 {
-      font-size: 2rem;
+      font-size: clamp(1.3rem, 6vw, 2rem);
       font-weight: 700;
-      letter-spacing: 0.2rem;
+      letter-spacing: 0.15rem;
       color: var(--text);
       text-transform: uppercase;
       flex: 1;
@@ -128,20 +128,21 @@
     }
 
     #board {
+      --tile: min(62px, calc((100vw - 50px) / 5));
       display: grid;
-      grid-template-rows: repeat(6, 62px);
-      grid-template-columns: repeat(5, 62px);
-      gap: 5px;
+      grid-template-rows: repeat(6, var(--tile));
+      grid-template-columns: repeat(5, var(--tile));
+      gap: min(5px, 1.2vw);
     }
 
     .tile {
-      width: 62px;
-      height: 62px;
+      width: var(--tile, 62px);
+      height: var(--tile, 62px);
       border: 2px solid var(--tile-border-empty);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2rem;
+      font-size: calc(var(--tile, 62px) * 0.5);
       font-weight: 700;
       text-transform: uppercase;
       color: #000000;
@@ -194,28 +195,27 @@
 
     #keyboard {
       width: 100%;
-      padding: 0 8px 16px;
+      padding: 0 min(8px, 2vw) min(16px, 4vw);
       flex-shrink: 0;
     }
 
     .key-row {
       display: flex;
       justify-content: center;
-      gap: 6px;
-      margin-bottom: 8px;
+      gap: min(6px, 1.5vw);
+      margin-bottom: min(8px, 2vw);
     }
 
     .key {
-      height: 58px;
-      min-width: 43px;
-      max-width: 43px;
+      height: clamp(44px, 12vw, 58px);
+      min-width: 0;
       flex: 1;
       border: none;
       border-radius: 4px;
       background: var(--key-bg);
       color: #000000;
       font-family: inherit;
-      font-size: 0.85rem;
+      font-size: clamp(0.65rem, 2.2vw, 0.85rem);
       font-weight: 700;
       text-transform: uppercase;
       cursor: pointer;
@@ -227,7 +227,7 @@
       transition: background 0.15s;
     }
 
-    .key.wide { min-width: 65px; max-width: 65px; font-size: 0.75rem; }
+    .key.wide { flex: 1.5; font-size: clamp(0.55rem, 1.8vw, 0.75rem); }
     .key:active { filter: brightness(0.85); }
 
     .key[data-state="correct"] { background: var(--color-correct); color: #fff; }
