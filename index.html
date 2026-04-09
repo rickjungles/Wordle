@@ -1596,18 +1596,22 @@ const GUESSES5 = VALID_GUESSES.filter(w => w.length === 5 && !ANSWERS5.includes(
 // Build fast lookup set
 const ALL_WORDS = new Set([...ANSWERS5, ...GUESSES5]);
 
-// Daily word — day index counted in Central Time calendar days since 2026-01-01
-function getCentralDayIndex() {
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric'
-  });
-  const [nm, nd, ny] = fmt.format(new Date()).split('/').map(Number);
-  const today = new Date(ny, nm - 1, nd);
-  const epoch = new Date(2026, 0, 1);
-  return Math.floor((today - epoch) / 86400000);
+// Daily word — day index counted from local midnight since 2026-01-01
+function getDailyWord() {
+    const startDate = new Date('2026-01-01T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayIndex = Math.floor((today - startDate) / 86400000);
+    console.log('dayIndex:', dayIndex);
+    return ANSWERS5[dayIndex % ANSWERS5.length];
 }
-const dayIndex = getCentralDayIndex();
-const DAILY_WORD = ANSWERS5[((dayIndex % ANSWERS5.length) + ANSWERS5.length) % ANSWERS5.length];
+const dayIndex = (() => {
+    const startDate = new Date('2026-01-01T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.floor((today - startDate) / 86400000);
+})();
+const DAILY_WORD = getDailyWord();
 
 // ─── STATE ─────────────────────────────────────────────────────────────────────
 let TARGET      = DAILY_WORD;
